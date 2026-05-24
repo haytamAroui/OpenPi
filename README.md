@@ -52,7 +52,7 @@ OpenPi is not a project template. It is a reusable Pi package you install once a
 
 ## Install
 
-Install OpenPi with Pi, not plain npm:
+Install OpenPi with Pi:
 
 ```bash
 pi install npm:@matyah00/openpi
@@ -73,14 +73,6 @@ After install, restart Pi or run `/reload`, then activate a profile:
 /openpi use full
 /reload
 ```
-
-Do not use this as the Pi activation step:
-
-```bash
-npm i @matyah00/openpi
-```
-
-Plain `npm i` only adds the package to `node_modules`; Pi will not recognize OpenPi until it is registered through `pi install` or the `packages` entry in Pi settings.
 
 The npm names `openpi` and `open-pi` are blocked by npm's package-name similarity policy, so the public npm package is:
 
@@ -395,7 +387,6 @@ Before publish, the package is checked with:
 ```bash
 npm pack --dry-run
 npx tsc --noEmit
-npm install @matyah00/openpi@latest --dry-run
 ```
 
 Current npm package:
