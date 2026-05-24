@@ -52,22 +52,35 @@ OpenPi is not a project template. It is a reusable Pi package you install once a
 
 ## Install
 
-```bash
-npm i @matyah00/openpi
-```
-
-For Pi:
+Install OpenPi with Pi, not plain npm:
 
 ```bash
 pi install npm:@matyah00/openpi
 ```
 
-Restart Pi after install, then activate a profile:
+That installs OpenPi globally for every Pi project. To install it only for one project, first `cd` into that project and use `-l`:
+
+```bash
+cd /path/to/your/project
+pi install npm:@matyah00/openpi -l
+```
+
+Important: `-l` writes to the `.pi/settings.json` in your current directory. If your shell is at your home folder, the local install is registered there, not in your project.
+
+After install, restart Pi or run `/reload`, then activate a profile:
 
 ```text
 /openpi use full
 /reload
 ```
+
+Do not use this as the Pi activation step:
+
+```bash
+npm i @matyah00/openpi
+```
+
+Plain `npm i` only adds the package to `node_modules`; Pi will not recognize OpenPi until it is registered through `pi install` or the `packages` entry in Pi settings.
 
 The npm names `openpi` and `open-pi` are blocked by npm's package-name similarity policy, so the public npm package is:
 
@@ -347,12 +360,14 @@ OpenPi is a package, not a project scaffold.
 The activation flow is explicit:
 
 ```text
-1. Install package with Pi
+1. Install package with Pi: pi install npm:@matyah00/openpi
 2. Run /openpi use <profile>
 3. OpenPi writes selected extension paths into .pi/settings.json
 4. Run /reload or restart Pi
 5. Use only the commands/tools for that profile
 ```
+
+For project-local installs, run `pi install npm:@matyah00/openpi -l` from the target project root. Running that command from another directory registers OpenPi for that directory instead.
 
 This keeps OpenPi portable across projects. You can add project-specific prompts and agents in `.pi/prompts` and `.pi/agents`; OpenPi will load them alongside the bundled resources where the active profile supports it.
 
@@ -386,8 +401,8 @@ npm install @matyah00/openpi@latest --dry-run
 Current npm package:
 
 ```bash
-npm i @matyah00/openpi
 pi install npm:@matyah00/openpi
+pi install npm:@matyah00/openpi -l   # project-local; run from the project root
 ```
 
 ---

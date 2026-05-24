@@ -1,6 +1,6 @@
 {
   "name": "@matyah00/openpi",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "Comprehensive, high-performance, and safety-hardened Pi-native multi-agent orchestration package, featuring advanced workflows, damage-control rules, and developer tooling.",
   "keywords": [
