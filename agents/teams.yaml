@@ -1,0 +1,73 @@
+full:
+  - scout
+  - planner
+  - builder
+  - reviewer
+  - documenter
+  - red-team
+
+plan-build:
+  - planner
+  - plan-reviewer
+  - builder
+  - reviewer
+
+research:
+  - scout
+  - directory-lister
+  - glob-matcher
+  - code-searcher
+  - librarian
+  - documenter
+  - red-team
+
+deep-research:
+  - directory-lister
+  - glob-matcher
+  - code-searcher
+  - librarian
+  - thinker
+  - plan-reviewer
+
+validation:
+  - tester
+  - basher
+  - reviewer
+
+guard:
+  - security-auditor
+  - rule-verifier
+  - ship-guard
+  - spec-reviewer
+
+spec-gate:
+  - problem-architect
+  - spec-reviewer
+  - plan-reviewer
+
+evolve:
+  - loop-controller
+  - problem-architect
+  - plan-reviewer
+
+frontend:
+  - scout
+  - frontend
+  - reviewer
+
+backend:
+  - scout
+  - backend
+  - reviewer
+
+pi-pi:
+  - pi-orchestrator
+  - ext-expert
+  - skill-expert
+  - prompt-expert
+  - agent-expert
+  - config-expert
+  - theme-expert
+  - tui-expert
+  - cli-expert
+  - keybinding-expert

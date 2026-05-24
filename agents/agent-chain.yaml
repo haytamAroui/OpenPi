@@ -1,0 +1,113 @@
+plan-build-review:
+  description: "Plan, implement, then review"
+  steps:
+    - agent: planner
+      prompt: "Plan the implementation for: $INPUT"
+    - agent: builder
+      prompt: "Implement this plan:\n\n$INPUT"
+    - agent: reviewer
+      prompt: "Review the implementation for bugs, regressions, and missing tests:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+research-plan:
+  description: "Explore, challenge, then plan"
+  steps:
+    - agent: scout
+      prompt: "Explore the repository for: $INPUT\n\nReturn relevant files, patterns, and constraints."
+    - agent: red-team
+      prompt: "Challenge this analysis. Find missing risks or false assumptions:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: planner
+      prompt: "Create an implementation plan using this evidence and critique:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+deep-explore:
+  description: "Map structure, search code, reason, then identify next steps"
+  steps:
+    - agent: directory-lister
+      prompt: "Map the repository areas relevant to: $INPUT"
+    - agent: code-searcher
+      prompt: "Search for exact symbols, routes, config keys, and tests relevant to:\n\n$INPUT\n\nDirectory evidence:\n$INPUT"
+    - agent: thinker
+      prompt: "Reason from this evidence and identify the smallest correct path forward:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+evidence-validate:
+  description: "Find evidence, run validation, then review risk"
+  steps:
+    - agent: code-searcher
+      prompt: "Find source and test evidence for: $INPUT"
+    - agent: tester
+      prompt: "Select and run the smallest useful validation for this evidence:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: reviewer
+      prompt: "Review the evidence and validation result for remaining risks:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+spec-to-plan:
+  description: "Clarify scope, validate requirements, then plan"
+  steps:
+    - agent: problem-architect
+      prompt: "Analyze this request and identify required context, risks, and validation:\n\n$INPUT"
+    - agent: spec-reviewer
+      prompt: "Validate whether this request/spec is clear enough for planning:\n\n$INPUT"
+    - agent: planner
+      prompt: "Create an implementation plan only if the spec is clear. Otherwise list clarification questions:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+ship-gate:
+  description: "Security, dependency, test-integrity, and diff readiness gate"
+  steps:
+    - agent: security-auditor
+      prompt: "Run a read-only security and secret scan for the current changes:\n\n$INPUT"
+    - agent: ship-guard
+      prompt: "Run the pre-ship gate using this security evidence:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: reviewer
+      prompt: "Review the ship gate result and identify any remaining blocking risk:\n\n$INPUT"
+
+evolution-loop:
+  description: "Detect environment gaps, propose improvements, and critique the plan"
+  steps:
+    - agent: loop-controller
+      prompt: "Run an improvement-loop analysis for:\n\n$INPUT"
+    - agent: problem-architect
+      prompt: "Turn the improvement report into a scoped implementation team spec:\n\n$INPUT"
+    - agent: plan-reviewer
+      prompt: "Challenge this improvement plan for overreach, missing validation, and risk:\n\n$INPUT"
+
+plan-review-plan:
+  description: "Create a plan, critique it, then refine it"
+  steps:
+    - agent: planner
+      prompt: "Create a detailed implementation plan for: $INPUT"
+    - agent: plan-reviewer
+      prompt: "Critically review this plan. Challenge assumptions, missing steps, ordering, tests, and risk:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: planner
+      prompt: "Revise the implementation plan using this critique:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+pi-package-design:
+  description: "Design Pi-native package resources with expert critique"
+  steps:
+    - agent: pi-orchestrator
+      prompt: "Break down this Pi package request and identify which Pi experts should influence it:\n\n$INPUT"
+    - agent: ext-expert
+      prompt: "Review the extension architecture needed for this package:\n\n$INPUT"
+    - agent: skill-expert
+      prompt: "Review the skill design and SKILL.md boundaries for this package:\n\n$INPUT"
+    - agent: config-expert
+      prompt: "Review package manifest, settings, and path concerns:\n\n$INPUT"
+    - agent: planner
+      prompt: "Synthesize the expert feedback into an implementation plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+frontend-flow:
+  description: "Frontend exploration, implementation, and review"
+  steps:
+    - agent: scout
+      prompt: "Map the frontend code relevant to: $INPUT"
+    - agent: frontend
+      prompt: "Implement or design the frontend change using this context:\n\n$INPUT"
+    - agent: reviewer
+      prompt: "Review the frontend result for responsive, accessibility, and regression risks:\n\n$INPUT"
+
+backend-flow:
+  description: "Backend exploration, implementation, and review"
+  steps:
+    - agent: scout
+      prompt: "Map the backend code relevant to: $INPUT"
+    - agent: backend
+      prompt: "Implement or design the backend change using this context:\n\n$INPUT"
+    - agent: reviewer
+      prompt: "Review the backend result for API, persistence, auth, and test risks:\n\n$INPUT"
