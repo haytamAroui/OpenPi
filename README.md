@@ -24,9 +24,9 @@ pi install npm:@matyah00/openpi
 
 Restart Pi after install.
 
-The unscoped npm name `openpi` is blocked by npm's package-name similarity
-policy because it is too close to `open`, `opener`, and `openai`. GitHub
-repository ownership does not reserve the npm package name.
+The npm names `openpi` and `open-pi` are blocked by npm's package-name
+similarity policy, so this package uses the public scoped name
+`@matyah00/openpi`.
 
 ## Profiles
 
