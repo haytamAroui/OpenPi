@@ -13,16 +13,20 @@ This package uses Pi-owned paths only:
 ## Install
 
 ```bash
-pi install C:/Users/hayta_o4yzgf5/Downloads/openpi
+npm i @matyah00/openpi
 ```
 
-From npm after publishing:
+For Pi:
 
 ```bash
 pi install npm:@matyah00/openpi
 ```
 
 Restart Pi after install.
+
+The unscoped npm name `openpi` is blocked by npm's package-name similarity
+policy because it is too close to `open`, `opener`, and `openai`. GitHub
+repository ownership does not reserve the npm package name.
 
 ## Profiles
 
