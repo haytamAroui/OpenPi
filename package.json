@@ -1,6 +1,6 @@
 {
   "name": "@matyah00/openpi",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "type": "module",
   "description": "Pi-native commands, skills, agents, and workflows.",
   "keywords": [
@@ -24,15 +24,23 @@
     "agents",
     "extensions",
     "prompts",
+    "scripts",
     "skills",
     "themes",
     "types",
     "damage-control-rules.yaml",
+    "LICENSE",
     "README.md",
     "tsconfig.json"
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "check": "npm run validate && npm run typecheck && npm run pack:check",
+    "pack:check": "npm pack --dry-run",
+    "typecheck": "tsc --noEmit",
+    "validate": "node scripts/validate-package.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.0"

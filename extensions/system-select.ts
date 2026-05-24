@@ -1,8 +1,9 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { bundledAgentsDir, bundledPiPiAgentsDir } from "./lib/packagePaths.ts";
+import { arrayField, parseMarkdownFrontmatter, stringField } from "./lib/markdown.ts";
 
 type AgentDef = {
   name: string;
@@ -12,28 +13,17 @@ type AgentDef = {
   source: string;
 };
 
-function parseFrontmatter(raw: string): { fields: Record<string, string>; body: string } {
-  const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
-  if (!match) return { fields: {}, body: raw };
-  const fields: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
-    const idx = line.indexOf(":");
-    if (idx > 0) fields[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-  }
-  return { fields, body: match[2] };
-}
-
 function scanAgents(dir: string, source: string): AgentDef[] {
   if (!existsSync(dir)) return [];
   const agents: AgentDef[] = [];
   for (const file of readdirSync(dir)) {
     if (!file.endsWith(".md")) continue;
     const raw = readFileSync(join(dir, file), "utf-8");
-    const { fields, body } = parseFrontmatter(raw);
+    const { frontmatter, body } = parseMarkdownFrontmatter(raw);
     agents.push({
-      name: fields.name || basename(file, ".md"),
-      description: fields.description || "",
-      tools: fields.tools ? fields.tools.split(",").map((tool) => tool.trim()).filter(Boolean) : [],
+      name: stringField(frontmatter.name) || basename(file, ".md"),
+      description: stringField(frontmatter.description),
+      tools: arrayField(frontmatter.tools),
       body: body.trim(),
       source,
     });

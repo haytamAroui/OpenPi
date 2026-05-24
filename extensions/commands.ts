@@ -1,7 +1,8 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { bundledPromptsDir } from "./lib/packagePaths.ts";
+import { arrayField, parseMarkdownFrontmatter, stringField } from "./lib/markdown.ts";
 
 type CommandDef = {
   name: string;
@@ -11,42 +12,6 @@ type CommandDef = {
   body: string;
   source: string;
 };
-
-function parseFrontmatter(raw: string): { fields: Record<string, string | string[]>; body: string } {
-  const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
-  if (!match) return { fields: {}, body: raw };
-
-  const fields: Record<string, string | string[]> = {};
-  let currentListKey = "";
-  for (const line of match[1].split("\n")) {
-    const listMatch = line.match(/^\s+-\s+(.+)$/);
-    if (listMatch && currentListKey) {
-      const existing = fields[currentListKey];
-      fields[currentListKey] = Array.isArray(existing) ? [...existing, listMatch[1].trim()] : [listMatch[1].trim()];
-      continue;
-    }
-
-    const idx = line.indexOf(":");
-    if (idx > 0) {
-      const key = line.slice(0, idx).trim();
-      const value = line.slice(idx + 1).trim();
-      currentListKey = key;
-      fields[key] = value;
-    }
-  }
-
-  return { fields, body: match[2].trim() };
-}
-
-function stringField(value: string | string[] | undefined): string {
-  return typeof value === "string" ? value : "";
-}
-
-function arrayField(value: string | string[] | undefined): string[] {
-  if (Array.isArray(value)) return value;
-  if (typeof value === "string" && value.trim()) return value.split(",").map((item) => item.trim()).filter(Boolean);
-  return [];
-}
 
 function expandArgs(template: string, args: string): string {
   const parts = args.split(/\s+/).filter(Boolean);
@@ -64,13 +29,13 @@ function scanPromptDir(dir: string, source: string): CommandDef[] {
   for (const file of readdirSync(dir)) {
     if (!file.endsWith(".md")) continue;
     const raw = readFileSync(join(dir, file), "utf-8");
-    const { fields, body } = parseFrontmatter(raw);
+    const { frontmatter, body } = parseMarkdownFrontmatter(raw);
     const firstLine = body.split("\n").find((line) => line.trim())?.trim() || "";
     commands.push({
-      name: stringField(fields.name) || basename(file, ".md"),
-      description: stringField(fields.description) || firstLine.slice(0, 120),
-      category: stringField(fields.category) || "general",
-      aliases: arrayField(fields.aliases),
+      name: stringField(frontmatter.name) || basename(file, ".md"),
+      description: stringField(frontmatter.description) || firstLine.slice(0, 120),
+      category: stringField(frontmatter.category) || "general",
+      aliases: arrayField(frontmatter.aliases),
       body,
       source,
     });
@@ -82,8 +47,8 @@ function scanPromptDir(dir: string, source: string): CommandDef[] {
 export default function (pi: ExtensionAPI) {
   const cwd = process.cwd();
   const commands = [
-    ...scanPromptDir(bundledPromptsDir, "openpi"),
     ...scanPromptDir(join(cwd, ".pi", "prompts"), ".pi"),
+    ...scanPromptDir(bundledPromptsDir, "openpi"),
   ];
   const byName = new Map<string, CommandDef>();
   const aliases = new Map<string, string>();

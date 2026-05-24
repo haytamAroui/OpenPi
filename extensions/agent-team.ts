@@ -1,10 +1,13 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
-import { Text } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { Text } from "@earendil-works/pi-tui";
 import { spawn } from "child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { join, resolve } from "path";
+import { parse as parseYaml } from "yaml";
 import { bundledAgentsDir } from "./lib/packagePaths.ts";
+import { arrayField, parseMarkdownFrontmatter, stringField } from "./lib/markdown.ts";
 
 type AgentDef = {
   name: string;
@@ -28,40 +31,37 @@ function displayName(name: string): string {
 }
 
 function parseTeamsYaml(raw: string): Record<string, string[]> {
+  const parsed = parseYaml(raw);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
   const teams: Record<string, string[]> = {};
-  let current: string | null = null;
-  for (const line of raw.split("\n")) {
-    const teamMatch = line.match(/^(\S[^:]*):$/);
-    if (teamMatch) {
-      current = teamMatch[1].trim();
-      teams[current] = [];
-      continue;
-    }
-    const itemMatch = line.match(/^\s+-\s+(.+)$/);
-    if (itemMatch && current) teams[current].push(itemMatch[1].trim());
+  for (const [name, members] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!Array.isArray(members)) continue;
+    teams[name] = members.filter((member): member is string => typeof member === "string");
   }
   return teams;
 }
 
 function parseAgentFile(filePath: string): AgentDef | null {
   const raw = readFileSync(filePath, "utf-8");
-  const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
-  if (!match) return null;
-
-  const frontmatter: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
-    const idx = line.indexOf(":");
-    if (idx > 0) frontmatter[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-  }
-  if (!frontmatter.name) return null;
+  const { frontmatter, body } = parseMarkdownFrontmatter(raw);
+  const name = stringField(frontmatter.name);
+  if (!name) return null;
 
   return {
-    name: frontmatter.name,
-    description: frontmatter.description || "",
-    tools: frontmatter.tools || "read,grep,find,ls",
-    systemPrompt: match[2].trim(),
+    name,
+    description: stringField(frontmatter.description),
+    tools: arrayField(frontmatter.tools).join(",") || "read,grep,find,ls",
+    systemPrompt: body,
     file: filePath,
   };
+}
+
+function writeSystemPromptFile(agentKey: string, systemPrompt: string): { dir: string; filePath: string } {
+  const dir = mkdtempSync(join(tmpdir(), "openpi-team-"));
+  const filePath = join(dir, `system-${agentKey.replace(/[^\w.-]+/g, "_")}.md`);
+  writeFileSync(filePath, systemPrompt, { encoding: "utf-8", mode: 0o600 });
+  return { dir, filePath };
 }
 
 function scanAgentDirs(cwd: string): AgentDef[] {
@@ -161,13 +161,14 @@ export default function (pi: ExtensionAPI) {
     const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "";
     const agentKey = state.def.name.toLowerCase().replace(/\s+/g, "-");
     const agentSessionFile = join(sessionDir, `${agentKey}.json`);
+    const systemPrompt = writeSystemPromptFile(agentKey, state.def.systemPrompt);
     const args = [
       "--mode", "json",
       "-p",
       "--no-extensions",
       "--tools", state.def.tools,
       "--thinking", "off",
-      "--append-system-prompt", state.def.systemPrompt,
+      "--append-system-prompt", systemPrompt.filePath,
       "--session", agentSessionFile,
     ];
     if (model) args.splice(4, 0, "--model", model);
@@ -178,6 +179,7 @@ export default function (pi: ExtensionAPI) {
     const chunks: string[] = [];
 
     return new Promise((resolveDone) => {
+      const cleanupPrompt = () => rmSync(systemPrompt.dir, { recursive: true, force: true });
       const proc = spawn("pi", args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env } });
       const timer = setInterval(() => {
         state.elapsed = Date.now() - start;
@@ -206,6 +208,7 @@ export default function (pi: ExtensionAPI) {
       proc.stderr!.on("data", () => {});
       proc.on("close", (code) => {
         clearInterval(timer);
+        cleanupPrompt();
         state.elapsed = Date.now() - start;
         state.status = code === 0 ? "done" : "error";
         if (code === 0) state.sessionFile = agentSessionFile;
@@ -214,6 +217,7 @@ export default function (pi: ExtensionAPI) {
       });
       proc.on("error", (error) => {
         clearInterval(timer);
+        cleanupPrompt();
         state.status = "error";
         state.lastWork = error.message;
         updateWidget();
