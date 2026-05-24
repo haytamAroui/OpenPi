@@ -8,6 +8,7 @@ import { join, resolve } from "path";
 import { parse as parseYaml } from "yaml";
 import { bundledAgentsDir } from "./lib/packagePaths.ts";
 import { arrayField, parseMarkdownFrontmatter, stringField } from "./lib/markdown.ts";
+import { writeAuditLog } from "./lib/auditLogger.ts";
 
 type AgentDef = {
   name: string;
@@ -238,6 +239,16 @@ export default function (pi: ExtensionAPI) {
       const { agent, task } = params as { agent: string; task: string };
       onUpdate?.({ content: [{ type: "text", text: `Dispatching to ${agent}...` }], details: { agent, task, status: "running" } });
       const result = await dispatchAgent(agent, task, ctx);
+      writeAuditLog(ctx.cwd, {
+        type: "team_agent",
+        name: agent,
+        task: task,
+        input: task,
+        output: result.output,
+        exitCode: result.exitCode,
+        elapsedMs: result.elapsed,
+        metadata: { teamName: activeTeamName }
+      });
       const text = result.output.length > 8000 ? `${result.output.slice(0, 8000)}\n\n... [truncated]` : result.output;
       return {
         content: [{ type: "text", text: `[${agent}] ${result.exitCode === 0 ? "done" : "error"} in ${Math.round(result.elapsed / 1000)}s\n\n${text}` }],

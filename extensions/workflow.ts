@@ -20,6 +20,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, getAgentDir, parseFrontmatter, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import { writeAuditLog } from "./lib/auditLogger.ts";
 
 type AgentScope = "user" | "project" | "both";
 type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -28,6 +29,8 @@ type ExecutionMode = "parallel" | "sequential";
 const MAX_AGENTS_PER_CALL = 8;
 const MAX_PARALLEL_CONCURRENCY = 4;
 const OUTPUT_PREVIEW_CHARS = 6_000;
+const DEFAULT_AGENT_TIMEOUT_MS = 120_000;
+const RETRY_DELAY_MS = 2_000;
 const ROLE_ALIASES: Record<string, string> = {
   "file_picker": "file-picker",
   "file-picker": "file-picker",
@@ -83,6 +86,8 @@ interface AgentRunRequest {
   model?: string;
   thinking?: ThinkingLevel;
   tools?: string[];
+  timeout?: number;
+  retry?: boolean;
 }
 
 interface UsageStats {
@@ -108,6 +113,7 @@ interface AgentRunResult {
   thinking?: ThinkingLevel;
   stopReason?: string;
   errorMessage?: string;
+  retryCount?: number;
 }
 
 interface SpawnAgentsDetails {
@@ -271,6 +277,7 @@ async function runSingleAgent(
   availableAgents: AgentConfig[],
   request: AgentRunRequest,
   signal: AbortSignal | undefined,
+  onProgress?: (agentName: string, text: string) => void,
 ): Promise<AgentRunResult> {
   const requestedAgent = normalizeRoleName(request.agent ?? request.agent_type);
   const prompt = (request.prompt ?? request.task ?? "").trim();
@@ -330,6 +337,7 @@ async function runSingleAgent(
         stdio: ["ignore", "pipe", "pipe"],
       });
       let buffer = "";
+      let progressText = "";
 
       const processLine = (line: string) => {
         if (!line.trim()) return;
@@ -338,6 +346,13 @@ async function runSingleAgent(
           event = JSON.parse(line);
         } catch {
           return;
+        }
+
+        // Stream text deltas for live progress
+        if (event.type === "message_update" && event.assistantMessageEvent?.type === "text_delta") {
+          const delta = event.assistantMessageEvent.delta || "";
+          progressText += delta;
+          if (onProgress) onProgress(requestedAgent, progressText);
         }
 
         if (event.type === "message_end" && event.message) {
@@ -397,17 +412,42 @@ async function runSingleAgent(
         if (signal.aborted) killProc();
         else signal.addEventListener("abort", killProc, { once: true });
       }
+
+      // Agent timeout
+      const timeoutMs = request.timeout ?? DEFAULT_AGENT_TIMEOUT_MS;
+      if (timeoutMs > 0) {
+        setTimeout(() => {
+          if (!proc.killed) {
+            wasAborted = true;
+            baseResult.stopReason = "timeout";
+            proc.kill("SIGTERM");
+            setTimeout(() => {
+              if (!proc.killed) proc.kill("SIGKILL");
+            }, 5_000);
+          }
+        }, timeoutMs);
+      }
     });
 
     if (wasAborted) {
-      return { ...baseResult, exitCode, errorMessage: "Subagent was aborted" };
+      return { ...baseResult, exitCode, errorMessage: baseResult.stopReason === "timeout" ? `Agent timed out after ${(request.timeout ?? DEFAULT_AGENT_TIMEOUT_MS) / 1000}s` : "Subagent was aborted" };
     }
 
-    return {
+    const result: AgentRunResult = {
       ...baseResult,
       exitCode,
       output: getFinalAssistantText(messages),
     };
+
+    // Retry logic: retry once if failed with empty output (transient failure)
+    if (request.retry && exitCode !== 0 && !result.output.trim() && !(result.retryCount ?? 0)) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      const retryResult = await runSingleAgent(projectCwd, availableAgents, { ...request, retry: false }, signal, onProgress);
+      retryResult.retryCount = 1;
+      return retryResult;
+    }
+
+    return result;
   } finally {
     if (tmpPromptPath) await fs.promises.rm(tmpPromptPath, { force: true }).catch(() => undefined);
     if (tmpPromptDir) await fs.promises.rm(tmpPromptDir, { recursive: true, force: true }).catch(() => undefined);
@@ -439,12 +479,13 @@ function summarizeSpawnResults(results: AgentRunResult[]): string {
     .map((result, index) => {
       const ok = result.exitCode === 0 && !result.errorMessage;
       const usage = formatUsage(result.usage);
+      const retryNote = result.retryCount ? ` (retried ${result.retryCount}x)` : "";
       const meta = [result.model, result.thinking ? `thinking:${result.thinking}` : undefined, usage]
         .filter(Boolean)
         .join(" | ");
       const body = result.output || result.errorMessage || result.stderr || "(no output)";
       return [
-        `## ${index + 1}. ${ok ? "OK" : "FAIL"} ${result.agent}`,
+        `## ${index + 1}. ${ok ? "OK" : "FAIL"} ${result.agent}${retryNote}`,
         meta ? `_${meta}_` : undefined,
         "",
         truncateText(body),
@@ -478,6 +519,8 @@ const AgentRequestSchema = Type.Object({
     }),
   ),
   tools: Type.Optional(Type.Array(Type.String(), { description: "Optional tool override for this agent process" })),
+  timeout: Type.Optional(Type.Number({ description: "Timeout in milliseconds for this agent. Default 120000 (2 minutes)." })),
+  retry: Type.Optional(Type.Boolean({ description: "Retry once on transient failure (empty output + non-zero exit). Default false." })),
 });
 
 export default function workflowExtension(pi: ExtensionAPI) {
@@ -543,7 +586,14 @@ export default function workflowExtension(pi: ExtensionAPI) {
 
       if (mode === "sequential") {
         for (const request of requests) {
-          const result = await runSingleAgent(ctx.cwd, discovery.agents, request, signal);
+          const runStart = Date.now();
+          const result = await runSingleAgent(ctx.cwd, discovery.agents, request, signal, (agentName, text) => {
+            onUpdate?.({
+              content: [{ type: "text", text: `spawn_agents [${agentName}]: ${text.split("\n").filter(Boolean).pop() || "working..."}` }],
+              details: makeDetails([...results]),
+            });
+          });
+          (result as any).elapsedMs = Date.now() - runStart;
           results.push(result);
           emitProgress();
           if (result.exitCode !== 0 || result.errorMessage) break;
@@ -553,7 +603,14 @@ export default function workflowExtension(pi: ExtensionAPI) {
           requests,
           MAX_PARALLEL_CONCURRENCY,
           async (request) => {
-            const result = await runSingleAgent(ctx.cwd, discovery.agents, request, signal);
+            const runStart = Date.now();
+            const result = await runSingleAgent(ctx.cwd, discovery.agents, request, signal, (agentName, text) => {
+              onUpdate?.({
+                content: [{ type: "text", text: `spawn_agents [${agentName}]: ${text.split("\n").filter(Boolean).pop() || "working..."}` }],
+                details: makeDetails([...results]),
+              });
+            });
+            (result as any).elapsedMs = Date.now() - runStart;
             results.push(result);
             emitProgress();
             return result;
@@ -563,6 +620,21 @@ export default function workflowExtension(pi: ExtensionAPI) {
       }
 
       const successCount = results.filter((result) => result.exitCode === 0 && !result.errorMessage).length;
+
+      for (const res of results) {
+        writeAuditLog(ctx.cwd, {
+          type: "workflow",
+          name: `spawn_agents:${res.agent}`,
+          task: res.prompt,
+          input: res.prompt,
+          output: res.output || res.errorMessage || "",
+          exitCode: res.exitCode,
+          elapsedMs: (res as any).elapsedMs || 0,
+
+          metadata: { executionMode: mode, success: res.exitCode === 0 && !res.errorMessage }
+        });
+      }
+
       return {
         content: [
           {

@@ -31,6 +31,7 @@ type TreeNode = {
   name: string;
   relativePath: string;
   isDirectory: boolean;
+  sizeBytes?: number;
   children?: TreeNode[];
 };
 
@@ -39,6 +40,7 @@ type SearchQuery = {
   cwd?: string;
   globs?: string[];
   caseInsensitive?: boolean;
+  isRegex?: boolean;
   before?: number;
   after?: number;
   maxResults?: number;
@@ -83,6 +85,7 @@ function buildTree(params: {
   maxDepth: number;
   maxEntries: number;
   includeHidden: boolean;
+  showSizes: boolean;
 }): { nodes: TreeNode[]; omitted: number; visited: number } {
   const ignoreNames = readIgnoreNames(params.projectRoot);
   let visited = 0;
@@ -120,7 +123,11 @@ function buildTree(params: {
           children: walk(absolutePath, depth + 1),
         });
       } else {
-        nodes.push({ name: entry.name, relativePath, isDirectory: false });
+        let sizeBytes: number | undefined;
+        if (params.showSizes) {
+          try { sizeBytes = fs.statSync(absolutePath).size; } catch { /* skip */ }
+        }
+        nodes.push({ name: entry.name, relativePath, isDirectory: false, sizeBytes });
       }
     }
     return nodes;
@@ -129,12 +136,19 @@ function buildTree(params: {
   return { nodes: walk(params.root, 0), omitted, visited };
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
 function renderTree(nodes: TreeNode[], prefix = ""): string[] {
   const lines: string[] = [];
   nodes.forEach((node, index) => {
     const isLast = index === nodes.length - 1;
     const connector = isLast ? "`-- " : "|-- ";
-    lines.push(`${prefix}${connector}${node.name}${node.isDirectory ? "/" : ""}`);
+    const sizeSuffix = node.sizeBytes !== undefined ? ` (${formatSize(node.sizeBytes)})` : "";
+    lines.push(`${prefix}${connector}${node.name}${node.isDirectory ? "/" : ""}${sizeSuffix}`);
     if (node.children?.length) {
       lines.push(...renderTree(node.children, `${prefix}${isLast ? "    " : "|   "}`));
     }
@@ -145,6 +159,7 @@ function renderTree(nodes: TreeNode[], prefix = ""): string[] {
 function runRipgrep(projectRoot: string, query: SearchQuery): Promise<string> {
   const cwd = resolveProjectPath(projectRoot, query.cwd);
   const args = ["--line-number", "--column", "--no-heading", "--color", "never"];
+  if (!query.isRegex) args.push("-F");
   if (query.caseInsensitive) args.push("-i");
   if (query.before) args.push("-B", String(query.before));
   if (query.after) args.push("-A", String(query.after));
@@ -193,13 +208,15 @@ export default function searchToolsExtension(pi: ExtensionAPI) {
       maxDepth: Type.Optional(Type.Number({ description: "Maximum directory depth. Default 3." })),
       maxEntries: Type.Optional(Type.Number({ description: "Maximum entries to include. Default 400." })),
       includeHidden: Type.Optional(Type.Boolean({ description: "Include hidden files and directories. Default false." })),
+      showSizes: Type.Optional(Type.Boolean({ description: "Show file sizes next to filenames. Default false." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const root = resolveProjectPath(ctx.cwd, params.root as string | undefined);
       const maxDepth = Math.max(0, Math.min(Number(params.maxDepth ?? 3), 8));
       const maxEntries = Math.max(20, Math.min(Number(params.maxEntries ?? 400), 4000));
       const includeHidden = Boolean(params.includeHidden);
-      const result = buildTree({ projectRoot: ctx.cwd, root, maxDepth, maxEntries, includeHidden });
+      const showSizes = Boolean(params.showSizes);
+      const result = buildTree({ projectRoot: ctx.cwd, root, maxDepth, maxEntries, includeHidden, showSizes });
       const header = [
         `root: ${normalizeRelative(ctx.cwd, root)}`,
         `depth: ${maxDepth}`,
@@ -236,6 +253,7 @@ export default function searchToolsExtension(pi: ExtensionAPI) {
           cwd: Type.Optional(Type.String({ description: "Project-relative directory to search in." })),
           globs: Type.Optional(Type.Array(Type.String(), { description: "Optional ripgrep -g patterns." })),
           caseInsensitive: Type.Optional(Type.Boolean({ description: "Use case-insensitive search." })),
+          isRegex: Type.Optional(Type.Boolean({ description: "Treat pattern as regex. Default false (literal/fixed-string search)." })),
           before: Type.Optional(Type.Number({ description: "Context lines before each match." })),
           after: Type.Optional(Type.Number({ description: "Context lines after each match." })),
           maxResults: Type.Optional(Type.Number({ description: "Maximum matches per file from rg -m." })),

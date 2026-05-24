@@ -8,9 +8,10 @@ import { join, resolve } from "path";
 import { parse as parseYaml } from "yaml";
 import { bundledAgentsDir } from "./lib/packagePaths.ts";
 import { arrayField, parseMarkdownFrontmatter, stringField } from "./lib/markdown.ts";
+import { writeAuditLog } from "./lib/auditLogger.ts";
 
-type ChainStep = { agent: string; prompt: string };
-type ChainDef = { name: string; description: string; steps: ChainStep[] };
+type ChainStep = { agent: string; prompt: string; timeout?: number };
+type ChainDef = { name: string; description: string; steps: ChainStep[]; continueOnError?: boolean };
 type AgentDef = { name: string; description: string; tools: string; systemPrompt: string };
 type StepState = { agent: string; status: "pending" | "running" | "done" | "error"; elapsed: number; lastWork: string };
 
@@ -24,19 +25,24 @@ function parseChainYaml(raw: string): ChainDef[] {
 
   return Object.entries(parsed as Record<string, unknown>).flatMap(([name, value]) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-    const chain = value as { description?: unknown; steps?: unknown };
+    const chain = value as { description?: unknown; steps?: unknown; continueOnError?: unknown };
     if (!Array.isArray(chain.steps)) return [];
     const steps = chain.steps.flatMap((step): ChainStep[] => {
       if (!step || typeof step !== "object" || Array.isArray(step)) return [];
-      const item = step as { agent?: unknown; prompt?: unknown };
+      const item = step as { agent?: unknown; prompt?: unknown; timeout?: unknown };
       if (typeof item.agent !== "string" || typeof item.prompt !== "string") return [];
-      return [{ agent: item.agent, prompt: item.prompt }];
+      return [{
+        agent: item.agent,
+        prompt: item.prompt,
+        timeout: typeof item.timeout === "number" ? item.timeout : undefined,
+      }];
     });
     if (!steps.length) return [];
     return [{
       name,
       description: typeof chain.description === "string" ? chain.description : "",
       steps,
+      continueOnError: typeof chain.continueOnError === "boolean" ? chain.continueOnError : undefined,
     }];
   });
 }
@@ -115,7 +121,13 @@ export default function (pi: ExtensionAPI) {
     }));
   }
 
-  function runAgent(agentDef: AgentDef, task: string, stepIndex: number, ctx: any): Promise<{ output: string; exitCode: number; elapsed: number }> {
+  function runAgent(
+    agentDef: AgentDef,
+    task: string,
+    stepIndex: number,
+    timeoutSecs: number | undefined,
+    ctx: any,
+  ): Promise<{ output: string; exitCode: number; elapsed: number }> {
     const model = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "";
     const agentKey = agentDef.name.toLowerCase().replace(/\s+/g, "-");
     const agentSessionFile = join(sessionDir, `chain-${agentKey}.json`);
@@ -137,9 +149,21 @@ export default function (pi: ExtensionAPI) {
     const start = Date.now();
     const chunks: string[] = [];
 
+    const timeoutMs = timeoutSecs ? timeoutSecs * 1000 : 120000;
+
     return new Promise((resolveDone) => {
       const cleanupPrompt = () => rmSync(systemPrompt.dir, { recursive: true, force: true });
       const proc = spawn("pi", args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env } });
+
+      let killed = false;
+      const killTimer = setTimeout(() => {
+        killed = true;
+        proc.kill("SIGTERM");
+        setTimeout(() => {
+          if (proc.exitCode === null) proc.kill("SIGKILL");
+        }, 2000);
+      }, timeoutMs);
+
       const timer = setInterval(() => {
         state.elapsed = Date.now() - start;
         updateWidget();
@@ -166,13 +190,17 @@ export default function (pi: ExtensionAPI) {
       proc.stderr!.setEncoding("utf-8");
       proc.stderr!.on("data", () => {});
       proc.on("close", (code) => {
+        clearTimeout(killTimer);
         clearInterval(timer);
         cleanupPrompt();
         state.elapsed = Date.now() - start;
         if (code === 0) agentSessions.set(agentKey, agentSessionFile);
-        resolveDone({ output: chunks.join(""), exitCode: code ?? 1, elapsed: state.elapsed });
+        const exitCode = killed ? 124 : (code ?? 1);
+        const finalOutput = killed ? `${chunks.join("")}\n\n[Agent timeout after ${timeoutSecs}s]` : chunks.join("");
+        resolveDone({ output: finalOutput, exitCode, elapsed: state.elapsed });
       });
       proc.on("error", (error) => {
+        clearTimeout(killTimer);
         clearInterval(timer);
         cleanupPrompt();
         resolveDone({ output: `Error spawning agent: ${error.message}`, exitCode: 1, elapsed: Date.now() - start });
@@ -188,28 +216,89 @@ export default function (pi: ExtensionAPI) {
 
     let input = task;
     const original = task;
+    const outputs: string[] = [];
+
     for (let i = 0; i < activeChain.steps.length; i++) {
       const step = activeChain.steps[i];
       stepStates[i].status = "running";
       updateWidget();
 
-      const prompt = step.prompt.replace(/\$INPUT/g, input).replace(/\$ORIGINAL/g, original);
+      let prompt = step.prompt.replace(/\$INPUT/g, input).replace(/\$ORIGINAL/g, original);
+      // Replace $STEP_N references
+      prompt = prompt.replace(/\$STEP_(\d+)/g, (match, numStr) => {
+        const num = parseInt(numStr, 10);
+        if (num > 0 && num <= outputs.length) {
+          return outputs[num - 1];
+        }
+        return match;
+      });
+
       const agentDef = allAgents.get(step.agent.toLowerCase());
       if (!agentDef) {
         stepStates[i].status = "error";
-        return { output: `Agent "${step.agent}" not found`, success: false, elapsed: Date.now() - start };
+        const errResult = { output: `Agent "${step.agent}" not found`, success: false, elapsed: Date.now() - start };
+        writeAuditLog(ctx.cwd, {
+          type: "chain_run",
+          name: activeChain.name,
+          task,
+          input: task,
+          output: errResult.output,
+          exitCode: 1,
+          elapsedMs: errResult.elapsed,
+          metadata: { stepsCount: activeChain.steps.length, success: false, error: "agent_not_found" }
+        });
+        return errResult;
       }
 
-      const result = await runAgent(agentDef, prompt, i, ctx);
+      const result = await runAgent(agentDef, prompt, i, step.timeout, ctx);
+      writeAuditLog(ctx.cwd, {
+        type: "chain_step",
+        name: `${activeChain.name}:${step.agent}`,
+        task: prompt,
+        input: input,
+        output: result.output,
+        exitCode: result.exitCode,
+        elapsedMs: result.elapsed,
+        metadata: { stepIndex: i, chainName: activeChain.name, agent: step.agent }
+      });
+
       if (result.exitCode !== 0) {
         stepStates[i].status = "error";
-        return { output: result.output, success: false, elapsed: Date.now() - start };
+        if (activeChain.continueOnError) {
+          outputs.push("");
+          updateWidget();
+          continue;
+        }
+        const errResult = { output: result.output, success: false, elapsed: Date.now() - start };
+        writeAuditLog(ctx.cwd, {
+          type: "chain_run",
+          name: activeChain.name,
+          task,
+          input: task,
+          output: errResult.output,
+          exitCode: 1,
+          elapsedMs: errResult.elapsed,
+          metadata: { stepsCount: activeChain.steps.length, success: false, error: "step_failed", failedStep: step.agent }
+        });
+        return errResult;
       }
       stepStates[i].status = "done";
       input = result.output;
+      outputs.push(result.output);
       updateWidget();
     }
-    return { output: input, success: true, elapsed: Date.now() - start };
+    const finalResult = { output: input, success: true, elapsed: Date.now() - start };
+    writeAuditLog(ctx.cwd, {
+      type: "chain_run",
+      name: activeChain.name,
+      task,
+      input: task,
+      output: finalResult.output,
+      exitCode: 0,
+      elapsedMs: finalResult.elapsed,
+      metadata: { stepsCount: activeChain.steps.length, success: true }
+    });
+    return finalResult;
   }
 
   pi.registerTool({

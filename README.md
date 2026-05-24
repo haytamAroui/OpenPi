@@ -84,6 +84,8 @@ The npm names `openpi` and `open-pi` are blocked by npm's package-name similarit
 /openpi use commands         enable prompt commands and core tools
 /openpi use workflow         enable /add, /fix, /review and spawn_agents
 /openpi use guard            enable security, dependency, and ship gates
+/openpi use commands+guard   combine multiple profiles (e.g. focus+safety)
+/openpi use full --dry-run   preview profile settings changes without writing
 /openpi use full             enable the broad OpenPi surface
 /openpi clear                remove OpenPi-managed extensions
 ```
@@ -102,12 +104,13 @@ Profiles update `.pi/settings.json`. Run `/reload` or restart Pi after switching
 
 ```text
 OpenPi
-  13 profiles          choose a focused runtime surface per task
-  19 prompt commands   /prime, /blueprint, /deep, /ship, /parallel, ...
-  36 agent prompts     planner, reviewer, tester, security-auditor, Pi experts
-  7 skills             ultrathink, test-first, security-guard, bowser, ...
+  13 profiles          choose or compose a focused runtime surface
+  23 prompt commands   /prime, /blueprint, /deep, /ship, /refactor, ...
+  42 agent prompts     planner, reviewer, tester, api-designer, Pi experts
+  9 skills             ultrathink, test-first, refactor-guide, bowser, ...
   11 themes            tokyo-night, rose-pine, gruvbox, nord, dracula, ...
   Native tools         search, audit, state, snapshot, dispatch, chains
+  Audit Telemetry      structured JSONL audit logging to .pi/logs/
 ```
 
 OpenPi is designed around one practical rule: load only the surface you need.
@@ -195,6 +198,10 @@ OpenPi role agents include:
 | `spec-reviewer` | Challenges unclear requirements before implementation |
 | `ship-guard` | Reviews release readiness |
 | `red-team` | Challenges plans and assumptions |
+| `api-designer` | Reviews REST/GraphQL APIs for design and naming consistency |
+| `perf-auditor` | Evaluates bundle sizes, N+1 queries, and resource leaks |
+| `migration-expert` | Plans database and architecture migration sequences |
+| `docs-writer` | Generates/maintains READMEs, manuals, and architecture documents |
 
 The `spawn_agents` tool can run agents sequentially or in parallel as isolated Pi subprocesses. It returns structured outputs: files, line ranges, commands, exact validation output, findings, and assumptions.
 
@@ -222,6 +229,10 @@ The `team` profile registers `dispatch_agent` and uses teams from `agents/teams.
 | `frontend` | scout, frontend, reviewer |
 | `backend` | scout, backend, reviewer |
 | `pi-pi` | Pi package, extension, skill, prompt, config, theme, TUI, CLI, and keybinding experts |
+| `perf` | scout, perf-auditor, planner, reviewer |
+| `docs` | scout, docs-writer, reviewer |
+| `api` | scout, api-designer, reviewer |
+| `migration` | scout, migration-expert, planner, reviewer |
 
 ### Chain runner
 
@@ -241,6 +252,10 @@ The `chain` profile registers `run_chain` for sequential workflows from `agents/
 | `spec-to-plan` | problem-architect -> spec-reviewer -> planner |
 | `ship-gate` | security-auditor -> ship-guard -> reviewer |
 | `pi-package-design` | Pi experts -> planner |
+| `refactor-flow` | scout -> problem-architect -> planner -> reviewer |
+| `docs-flow` | scout -> docs-writer -> reviewer |
+| `perf-audit` | scout -> perf-auditor -> planner |
+| `full-lifecycle` | problem-architect -> planner -> plan-reviewer -> builder -> tester -> reviewer |
 
 ---
 
@@ -250,19 +265,20 @@ OpenPi registers native Pi tools through profiles.
 
 | Tool | Purpose |
 |------|---------|
-| `project_tree` | Return a scoped project tree with ignore handling |
-| `code_search_batch` | Run multiple code searches in one call |
-| `env_scan` | Detect stack, package managers, scripts, and environment clues |
-| `secret_scan` | Search for common secret and credential patterns |
-| `ghost_test_scan` | Find weak, vacuous, or reward-hacked tests |
+| `project_tree` | Return a scoped project tree with ignore handling (supports file sizes) |
+| `code_search_batch` | Run multiple code searches in one call (supports case-sensitivity & regex toggle) |
+| `env_scan` | Detect stack, package managers, scripts, and environment clues (24+ frameworks) |
+| `secret_scan` | Search for 22 types of cloud keys, tokens, credentials, and high-entropy hex strings |
+| `ghost_test_scan` | Find weak, empty, mocked-everything, self-comparing, or reward-hacked tests |
+| `sast_scan` | Static Application Security Testing for eval, SQL concat, SSRF, CORS wildcards, and XSS |
 | `dependency_inventory` | Summarize dependency manifests and lockfiles |
 | `session_state` | Read current session state |
 | `goal_state` | Read goal memory state |
 | `write_snapshot` | Write a continuation snapshot |
 | `parallel_safety_check` | Check file ownership overlap before parallel work |
-| `spawn_agents` | Run role agents as isolated Pi subprocesses |
+| `spawn_agents` | Run role agents as isolated Pi subprocesses (supports retries & timeouts) |
 | `dispatch_agent` | Dispatch to the active specialist team |
-| `run_chain` | Run a named sequential agent chain |
+| `run_chain` | Run a named sequential agent chain (supports step timeouts, continueOnError, & $STEP_N) |
 
 ---
 
@@ -279,6 +295,8 @@ OpenPi ships focused Pi skills:
 | `session-continuity` | Long context, resuming, stopping, compaction handoffs |
 | `env-scanner` | Unknown repos, setup issues, stack detection |
 | `bowser` | Playwright-powered browser automation and UI testing |
+| `refactor-guide` | Guides safe codebase refactoring with code smell detection and verification |
+| `perf-auditor` | Structured resource profiling and runtime execution optimization |
 
 ---
 

@@ -4,6 +4,7 @@ full:
   - builder
   - reviewer
   - documenter
+  - docs-writer
   - red-team
 
 plan-build:
@@ -58,6 +59,28 @@ frontend:
 backend:
   - scout
   - backend
+  - reviewer
+
+perf:
+  - scout
+  - perf-auditor
+  - planner
+  - reviewer
+
+docs:
+  - scout
+  - docs-writer
+  - reviewer
+
+api:
+  - scout
+  - api-designer
+  - reviewer
+
+migration:
+  - scout
+  - migration-expert
+  - planner
   - reviewer
 
 pi-pi:

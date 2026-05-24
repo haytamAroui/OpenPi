@@ -1,15 +1,19 @@
 {
   "name": "@matyah00/openpi",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Pi-native commands, skills, agents, and workflows.",
+  "description": "Comprehensive, high-performance, and safety-hardened Pi-native multi-agent orchestration package, featuring advanced workflows, damage-control rules, and developer tooling.",
   "keywords": [
     "pi-package",
     "pi-coding-agent",
     "commands",
     "skills",
     "agents",
-    "workflows"
+    "workflows",
+    "orchestration",
+    "safety",
+    "multi-agent",
+    "damage-control"
   ],
   "homepage": "https://github.com/haytamAroui/OpenPi#readme",
   "repository": {

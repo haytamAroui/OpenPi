@@ -111,3 +111,53 @@ backend-flow:
       prompt: "Implement or design the backend change using this context:\n\n$INPUT"
     - agent: reviewer
       prompt: "Review the backend result for API, persistence, auth, and test risks:\n\n$INPUT"
+
+refactor-flow:
+  description: "Explore, analyze, plan refactoring, then review safety"
+  steps:
+    - agent: scout
+      prompt: "Map the code areas relevant to this refactoring: $INPUT"
+    - agent: problem-architect
+      prompt: "Analyze the code smell and structural issues. Identify the minimal safe refactoring:\n\n$INPUT"
+    - agent: planner
+      prompt: "Create a step-by-step refactoring plan with verification at each step:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: reviewer
+      prompt: "Review whether this refactoring plan preserves behavior and has adequate verification:\n\n$INPUT"
+
+docs-flow:
+  description: "Explore project, generate documentation, then review accuracy"
+  steps:
+    - agent: scout
+      prompt: "Map the project structure, public APIs, and existing documentation for: $INPUT"
+    - agent: docs-writer
+      prompt: "Generate or update the documentation using this project analysis:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: reviewer
+      prompt: "Review the documentation for accuracy, completeness, and clarity:\n\n$INPUT"
+
+perf-audit:
+  description: "Explore, audit performance, then plan improvements"
+  steps:
+    - agent: scout
+      prompt: "Map the code areas and hot paths relevant to: $INPUT"
+    - agent: perf-auditor
+      prompt: "Run a performance audit on the mapped code areas:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: planner
+      prompt: "Create a prioritized improvement plan from the performance audit:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+
+full-lifecycle:
+  description: "Complete feature lifecycle: scope, plan, critique, revise, build, test, review"
+  steps:
+    - agent: problem-architect
+      prompt: "Analyze scope, risks, and required context for: $INPUT"
+    - agent: planner
+      prompt: "Create a detailed implementation plan:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: plan-reviewer
+      prompt: "Critically review this plan for missing steps, risks, and ordering:\n\n$INPUT"
+    - agent: planner
+      prompt: "Revise the plan using this critique:\n\n$INPUT\n\nOriginal request: $ORIGINAL"
+    - agent: builder
+      prompt: "Implement the revised plan:\n\n$INPUT"
+    - agent: tester
+      prompt: "Run targeted validation for the implementation:\n\n$INPUT"
+    - agent: reviewer
+      prompt: "Final review of the implementation for bugs, regressions, and missing tests:\n\n$INPUT\n\nOriginal request: $ORIGINAL"

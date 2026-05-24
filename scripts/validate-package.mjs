@@ -88,11 +88,38 @@ for (const [chainName, chain] of Object.entries(chains)) {
       continue;
     }
     if (!agentNames.has(step.agent)) fail(`agents/agent-chain.yaml: ${chainName} references unknown agent ${step.agent}`);
-    if (typeof step.prompt !== "string" || !step.prompt.trim()) fail(`agents/agent-chain.yaml: ${chainName} step ${index + 1} missing prompt`);
+    if (typeof step.prompt !== "string" || !step.prompt.trim()) {
+      fail(`agents/agent-chain.yaml: ${chainName} step ${index + 1} missing prompt`);
+    } else if (!step.prompt.includes("$INPUT") && !step.prompt.includes("$ORIGINAL") && !/\$STEP_\d+/.test(step.prompt)) {
+      fail(`agents/agent-chain.yaml: ${chainName} step ${index + 1} prompt must contain either $INPUT, $ORIGINAL or $STEP_N`);
+    }
+  }
+}
+
+// 2. Validate skill directories
+const skillsAbsolute = join(root, "skills");
+if (existsSync(skillsAbsolute)) {
+  for (const entry of readdirSync(skillsAbsolute, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      const skillFile = join(skillsAbsolute, entry.name, "SKILL.md");
+      if (!existsSync(skillFile)) {
+        fail(`skills/${entry.name}: missing SKILL.md`);
+      }
+    }
+  }
+}
+
+// 3. Validate theme JSON files
+for (const file of walk("themes", (name) => name.endsWith(".json"))) {
+  try {
+    JSON.parse(read(file));
+  } catch (err) {
+    fail(`${file}: invalid JSON theme file: ${err.message}`);
   }
 }
 
 if (failures.length) {
+
   console.error(failures.map((item) => `- ${item}`).join("\n"));
   process.exit(1);
 }

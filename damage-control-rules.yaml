@@ -17,6 +17,7 @@ bashToolPatterns:
     reason: recursive chmod 777
   - pattern: '\bchown\s+-[Rr].*\broot\b'
     reason: recursive chown to root
+  # --- Git destructive operations ---
   - pattern: '\bgit\s+reset\s+--hard\b'
     reason: git reset --hard (use --soft or stash)
   - pattern: '\bgit\s+clean\s+(-[^\s]*)*-[fd]'
@@ -51,6 +52,7 @@ bashToolPatterns:
   - pattern: '\bgit\s+push\s+\S+\s+:\S+'
     reason: Deletes remote branch (old syntax)
     ask: true
+  # --- System-level destructive ---
   - pattern: '\bmkfs\.'
     reason: filesystem format command
   - pattern: '\bdd\s+.*of=/dev/'
@@ -63,6 +65,7 @@ bashToolPatterns:
     reason: pkill -9
   - pattern: '\bhistory\s+-c\b'
     reason: clearing shell history
+  # --- AWS ---
   - pattern: '\baws\s+s3\s+rm\s+.*--recursive'
     reason: aws s3 rm --recursive (deletes all objects)
   - pattern: '\baws\s+s3\s+rb\s+.*--force'
@@ -83,6 +86,7 @@ bashToolPatterns:
     reason: aws iam delete-role
   - pattern: '\baws\s+iam\s+delete-user\b'
     reason: aws iam delete-user
+  # --- GCP ---
   - pattern: '\bgcloud\s+projects\s+delete\b'
     reason: gcloud projects delete (DELETES ENTIRE PROJECT)
   - pattern: '\bgcloud\s+compute\s+instances\s+delete\b'
@@ -108,6 +112,7 @@ bashToolPatterns:
   - pattern: '\bgcloud\s+iam\s+policies\b'
     reason: gcloud iam policies (modifies IAM policies)
     ask: true
+  # --- Firebase ---
   - pattern: '\bfirebase\s+projects:delete\b'
     reason: firebase projects:delete (deletes entire project)
   - pattern: '\bfirebase\s+firestore:delete\s+.*--all-collections'
@@ -118,6 +123,7 @@ bashToolPatterns:
     reason: firebase hosting:disable
   - pattern: '\bfirebase\s+functions:delete\b'
     reason: firebase functions:delete
+  # --- Vercel ---
   - pattern: '\bvercel\s+remove\s+.*--yes'
     reason: vercel remove --yes (removes deployment)
   - pattern: '\bvercel\s+projects\s+rm\b'
@@ -130,10 +136,12 @@ bashToolPatterns:
     reason: vercel remove (removes deployment)
   - pattern: '\bvercel\s+domains\s+rm\b'
     reason: vercel domains rm (removes custom domain)
+  # --- Netlify ---
   - pattern: '\bnetlify\s+sites:delete\b'
     reason: netlify sites:delete (deletes entire site)
   - pattern: '\bnetlify\s+functions:delete\b'
     reason: netlify functions:delete
+  # --- Cloudflare ---
   - pattern: '\bwrangler\s+delete\b'
     reason: wrangler delete (deletes Worker)
   - pattern: '\bwrangler\s+r2\s+bucket\s+delete\b'
@@ -144,6 +152,112 @@ bashToolPatterns:
     reason: wrangler d1 delete (deletes database)
   - pattern: '\bwrangler\s+queues\s+delete\b'
     reason: wrangler queues delete
+  # --- DigitalOcean ---
+  - pattern: '\bdoctl\s+compute\s+droplet\s+delete\b'
+    reason: doctl compute droplet delete (destroys server)
+  - pattern: '\bdoctl\s+databases\s+delete\b'
+    reason: doctl databases delete (destroys database cluster)
+  - pattern: '\bdoctl\s+kubernetes\s+cluster\s+delete\b'
+    reason: doctl kubernetes cluster delete (destroys k8s cluster)
+  - pattern: '\bdoctl\s+apps\s+delete\b'
+    reason: doctl apps delete (destroys App Platform app)
+  - pattern: '\bdoctl\s+compute\s+volume\s+delete\b'
+    reason: doctl compute volume delete (destroys block storage)
+  # --- Heroku ---
+  - pattern: '\bheroku\s+apps:destroy\b'
+    reason: heroku apps:destroy (permanently deletes app)
+  - pattern: '\bheroku\s+pg:reset\b'
+    reason: heroku pg:reset (wipes entire database)
+  - pattern: '\bheroku\s+config:unset\b'
+    reason: heroku config:unset (removes environment variables)
+    ask: true
+  - pattern: '\bheroku\s+domains:remove\b'
+    reason: heroku domains:remove (removes custom domain)
+    ask: true
+  - pattern: '\bheroku\s+addons:destroy\b'
+    reason: heroku addons:destroy (removes addon and its data)
+  # --- Fly.io ---
+  - pattern: '\bfly\s+apps\s+destroy\b'
+    reason: fly apps destroy (permanently deletes app)
+  - pattern: '\bfly\s+volumes\s+destroy\b'
+    reason: fly volumes destroy (destroys persistent volume)
+  - pattern: '\bfly\s+secrets\s+unset\b'
+    reason: fly secrets unset (removes secrets)
+    ask: true
+  - pattern: '\bfly\s+postgres\s+destroy\b'
+    reason: fly postgres destroy (destroys database)
+  - pattern: '\bflyctl\s+destroy\b'
+    reason: flyctl destroy (permanently deletes app)
+  # --- Supabase ---
+  - pattern: '\bsupabase\s+db\s+reset\b'
+    reason: supabase db reset (wipes database and re-runs migrations)
+  - pattern: '\bsupabase\s+projects\s+delete\b'
+    reason: supabase projects delete (destroys project)
+  - pattern: '\bsupabase\s+functions\s+delete\b'
+    reason: supabase functions delete (removes edge function)
+  # --- Prisma ---
+  - pattern: '\bprisma\s+migrate\s+reset\b'
+    reason: prisma migrate reset (drops database and re-runs all migrations)
+  - pattern: '\bprisma\s+db\s+push\s+.*--force-reset'
+    reason: prisma db push --force-reset (drops and recreates database)
+  - pattern: '\bprisma\s+db\s+execute\b'
+    reason: prisma db execute (runs raw SQL against database)
+    ask: true
+  # --- Terraform ---
+  - pattern: '\bterraform\s+destroy\b'
+    reason: terraform destroy (destroys ALL managed infrastructure)
+  - pattern: '\bterraform\s+state\s+rm\b'
+    reason: terraform state rm (removes resource from state, may orphan infra)
+  - pattern: '\bterraform\s+taint\b'
+    reason: terraform taint (marks resource for recreation)
+    ask: true
+  - pattern: '\bterraform\s+force-unlock\b'
+    reason: terraform force-unlock (dangerous state lock override)
+  # --- Kubernetes ---
+  - pattern: '\bkubectl\s+delete\s+namespace\b'
+    reason: kubectl delete namespace (destroys ALL resources in namespace)
+  - pattern: '\bkubectl\s+delete\s+deployment\b'
+    reason: kubectl delete deployment
+    ask: true
+  - pattern: '\bkubectl\s+delete\s+pvc\b'
+    reason: kubectl delete pvc (destroys persistent volume claim and data)
+  - pattern: '\bkubectl\s+delete\s+secret\b'
+    reason: kubectl delete secret
+    ask: true
+  - pattern: '\bkubectl\s+delete\s+(-[^\s]*\s+)*--all\b'
+    reason: kubectl delete --all (mass deletion)
+  - pattern: '\bhelm\s+uninstall\b'
+    reason: helm uninstall (removes Helm release and its resources)
+    ask: true
+  - pattern: '\bhelm\s+delete\b'
+    reason: helm delete (removes Helm release)
+    ask: true
+  # --- Docker ---
+  - pattern: '\bdocker\s+system\s+prune\s+.*-a'
+    reason: docker system prune -a (removes ALL unused images, containers, networks)
+  - pattern: '\bdocker\s+volume\s+prune\b'
+    reason: docker volume prune (removes ALL unused volumes and their data)
+  - pattern: '\bdocker\s+rmi\s+.*-f\b'
+    reason: docker rmi -f (force removes images)
+  - pattern: '\bdocker\s+rm\s+.*-f\b'
+    reason: docker rm -f (force removes running containers)
+  - pattern: '\bdocker\s+compose\s+down\s+.*-v\b'
+    reason: docker compose down -v (removes volumes with data)
+    ask: true
+  # --- Pipe-to-shell attacks ---
+  - pattern: '\bcurl\s+.*\|\s*sh\b'
+    reason: Pipe-to-shell attack vector (curl | sh)
+  - pattern: '\bcurl\s+.*\|\s*bash\b'
+    reason: Pipe-to-shell attack vector (curl | bash)
+  - pattern: '\bwget\s+.*-O\s*-\s*\|\s*sh\b'
+    reason: Pipe-to-shell attack vector (wget -O- | sh)
+  - pattern: '\bwget\s+.*-O\s*-\s*\|\s*bash\b'
+    reason: Pipe-to-shell attack vector (wget -O- | bash)
+  - pattern: '\bcurl\s+.*\|\s*sudo\s+sh\b'
+    reason: Pipe-to-shell with sudo (extremely dangerous)
+  - pattern: '\bcurl\s+.*\|\s*sudo\s+bash\b'
+    reason: Pipe-to-shell with sudo (extremely dangerous)
+  # --- SQL ---
   - pattern: 'DELETE\s+FROM\s+\w+\s*;'
     reason: DELETE without WHERE clause (will delete ALL rows)
   - pattern: 'DELETE\s+\*\s+FROM'
@@ -158,6 +272,9 @@ bashToolPatterns:
     reason: DROP SCHEMA
   - pattern: '\bDELETE\s+FROM\s+\w+\s+WHERE\b.*\bid\s*='
     reason: SQL DELETE with specific ID
+    ask: true
+  - pattern: '\bALTER\s+TABLE\s+\w+\s+DROP\s+COLUMN\b'
+    reason: ALTER TABLE DROP COLUMN (irreversible data loss)
     ask: true
 
 zeroAccessPaths:
@@ -202,6 +319,20 @@ zeroAccessPaths:
   - "dump.sql"
   - "backup.sql"
   - "*.dump"
+  # New zero-access paths
+  - "supabase/.env"
+  - ".wrangler/"
+  - "*.tfvars"
+  - "terraform.tfvars"
+  - ".pulumi/"
+  - "~/.config/heroku/"
+  - "~/.fly/"
+  - "~/.config/flyctl/"
+  - "~/.doctl/"
+  - "~/.config/doctl/"
+  - "~/.config/supabase/"
+  - "*.keystore"
+  - "*.jks"
 
 readOnlyPaths:
   - /etc/
@@ -245,6 +376,12 @@ readOnlyPaths:
   - .venv/
   - venv/
   - target/
+  # New read-only paths
+  - schema.prisma
+  - "drizzle/"
+  - "migrations/"
+  - "*.generated.ts"
+  - "*.generated.js"
 
 noDeletePaths:
   - CLAUDE.md
@@ -275,3 +412,19 @@ noDeletePaths:
   - docker-compose.yml
   - "docker-compose.*.yml"
   - .dockerignore
+  # New no-delete paths
+  - ".env.example"
+  - ".env.sample"
+  - "docker-compose.override.yml"
+  - Makefile
+  - Procfile
+  - "fly.toml"
+  - "vercel.json"
+  - "netlify.toml"
+  - "wrangler.toml"
+  - "supabase/config.toml"
+  - ".editorconfig"
+  - ".prettierrc"
+  - ".eslintrc"
+  - ".eslintrc.*"
+  - "biome.json"
