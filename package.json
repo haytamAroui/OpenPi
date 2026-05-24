@@ -1,7 +1,6 @@
 {
-  "name": "openpi",
+  "name": "@matyah00/openpi",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Pi-native commands, skills, agents, and workflows.",
   "keywords": [
@@ -12,6 +11,29 @@
     "agents",
     "workflows"
   ],
+  "homepage": "https://github.com/haytamAroui/OpenPi#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haytamAroui/OpenPi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/haytamAroui/OpenPi/issues"
+  },
+  "license": "MIT",
+  "files": [
+    "agents",
+    "extensions",
+    "prompts",
+    "skills",
+    "themes",
+    "types",
+    "damage-control-rules.yaml",
+    "README.md",
+    "tsconfig.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "yaml": "^2.8.0"
   },

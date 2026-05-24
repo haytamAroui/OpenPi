@@ -16,6 +16,12 @@ This package uses Pi-owned paths only:
 pi install C:/Users/hayta_o4yzgf5/Downloads/openpi
 ```
 
+From npm after publishing:
+
+```bash
+pi install npm:@matyah00/openpi
+```
+
 Restart Pi after install.
 
 ## Profiles
